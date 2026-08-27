@@ -1,0 +1,17 @@
+[package]
+name = "miniscript-diagnostics"
+version = "0.1.0"
+edition = "2021"
+description = "A diagnostic/explanation layer over rust-miniscript: explains Miniscript satisfaction state under a supplied spending context."
+license = "CC0-1.0"
+
+[lib]
+name = "miniscript_diagnostics"
+path = "src/lib.rs"
+
+[dependencies]
+miniscript = "=13.1.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
