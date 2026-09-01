@@ -97,7 +97,7 @@ fn exit_code_three_for_impossible() {
 #[test]
 fn exit_code_four_for_unsupported() {
     let output = cli_command()
-        .arg(format!("andor(pk({KEY_A}),pk({KEY_A}),pk({KEY_A}))"))
+        .arg("1")
         .output()
         .expect("failed to run CLI binary");
     assert_eq!(output.status.code(), Some(4));

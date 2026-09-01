@@ -23,6 +23,7 @@ ROOT STATUS: UNAVAILABLE
 * `sha256`, `hash256`, `ripemd160`, `hash160`
 * `after`, `older`
 * `and_v`, `and_b`, `or_i`
+* `or_b`, `andor`
 * `thresh(k, ...)`
 
 ## Usage

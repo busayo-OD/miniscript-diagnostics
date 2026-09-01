@@ -47,8 +47,14 @@ where
 
         Terminal::AndV(left, right) => evaluate_and("AND_V", left, right, ctx),
         Terminal::AndB(left, right) => evaluate_and("AND_B", left, right, ctx),
+        Terminal::AndOr(a, b, c) => evaluate_andor(a, b, c, ctx),
         Terminal::OrI(left, right) => evaluate_or_i(left, right, ctx),
+        Terminal::OrD(left, right) => evaluate_or("OR_D", left, right, ctx),
+        Terminal::OrC(left, right) => evaluate_or("OR_C", left, right, ctx),
+        Terminal::OrB(left, right) => evaluate_or("OR_B", left, right, ctx),
         Terminal::Thresh(thresh) => evaluate_thresh(thresh, ctx),
+        Terminal::Multi(thresh) => evaluate_multi("MULTI", thresh, ctx),
+        Terminal::MultiA(thresh) => evaluate_multi("MULTI_A", thresh, ctx),
 
         other => unsupported(other),
     }
@@ -75,12 +81,6 @@ fn terminal_kind_name<Pk: MiniscriptKey, Ctx: ScriptContext>(
         Terminal::False => "false".into(),
         Terminal::RawPkH(_) => "raw pkh (hash160 only)".into(),
         Terminal::DupIf(_) => "d: (DupIf wrapper)".into(),
-        Terminal::AndOr(..) => "andor".into(),
-        Terminal::OrB(..) => "or_b".into(),
-        Terminal::OrD(..) => "or_d".into(),
-        Terminal::OrC(..) => "or_c".into(),
-        Terminal::Multi(_) => "multi".into(),
-        Terminal::MultiA(_) => "multi_a".into(),
         _ => "unrecognized fragment".into(),
     }
 }
@@ -292,6 +292,31 @@ where
     Diagnostic::combinator(label, status, vec![left_diagnostic, right_diagnostic])
 }
 
+/// Evaluates `andor(A, B, C)`: satisfied via `(A AND B)` or via `C`.
+fn evaluate_andor<Pk, Ctx>(
+    a: &Arc<Miniscript<Pk, Ctx>>,
+    b: &Arc<Miniscript<Pk, Ctx>>,
+    c: &Arc<Miniscript<Pk, Ctx>>,
+    ctx: &DiagnosticContext<Pk>,
+) -> Diagnostic
+where
+    Pk: MiniscriptKey,
+    Ctx: ScriptContext,
+{
+    let a_diagnostic = evaluate(a, ctx);
+    let b_diagnostic = evaluate(b, ctx);
+    let c_diagnostic = evaluate(c, ctx);
+
+    let and_status = Status::combine_and(a_diagnostic.status, b_diagnostic.status);
+    let status = Status::combine_or(and_status, c_diagnostic.status);
+
+    Diagnostic::combinator(
+        "ANDOR",
+        status,
+        vec![a_diagnostic, b_diagnostic, c_diagnostic],
+    )
+}
+
 fn evaluate_or_i<Pk, Ctx>(
     left: &Arc<Miniscript<Pk, Ctx>>,
     right: &Arc<Miniscript<Pk, Ctx>>,
@@ -306,6 +331,25 @@ where
     let status = Status::combine_or(left_diagnostic.status, right_diagnostic.status);
 
     Diagnostic::combinator("OR_I", status, vec![left_diagnostic, right_diagnostic])
+}
+
+/// Evaluates disjunctive fragments that require at least one side to be
+/// satisfiable.
+fn evaluate_or<Pk, Ctx>(
+    label: &str,
+    left: &Arc<Miniscript<Pk, Ctx>>,
+    right: &Arc<Miniscript<Pk, Ctx>>,
+    ctx: &DiagnosticContext<Pk>,
+) -> Diagnostic
+where
+    Pk: MiniscriptKey,
+    Ctx: ScriptContext,
+{
+    let left_diagnostic = evaluate(left, ctx);
+    let right_diagnostic = evaluate(right, ctx);
+    let status = Status::combine_or(left_diagnostic.status, right_diagnostic.status);
+
+    Diagnostic::combinator(label, status, vec![left_diagnostic, right_diagnostic])
 }
 
 fn evaluate_thresh<Pk, Ctx>(
@@ -336,6 +380,35 @@ where
         .count();
 
     Diagnostic::combinator(format!("THRESH({k}, {n})"), status, children)
+        .with_meta("required", k.to_string())
+        .with_meta("satisfied", satisfied.to_string())
+}
+
+fn evaluate_multi<Pk, const MAX: usize>(
+    label: &str,
+    thresh: &Threshold<Pk, MAX>,
+    ctx: &DiagnosticContext<Pk>,
+) -> Diagnostic
+where
+    Pk: MiniscriptKey,
+{
+    let k = thresh.k();
+    let n = thresh.n();
+
+    let children: Vec<Diagnostic> = thresh.iter().map(|pk| evaluate_pk("pk", pk, ctx)).collect();
+
+    let statuses: Vec<Status> = children
+        .iter()
+        .map(|diagnostic| diagnostic.status)
+        .collect();
+
+    let status = Status::combine_thresh(k, &statuses);
+    let satisfied = statuses
+        .iter()
+        .filter(|status| **status == Status::Satisfied)
+        .count();
+
+    Diagnostic::combinator(format!("{label}({k}, {n})"), status, children)
         .with_meta("required", k.to_string())
         .with_meta("satisfied", satisfied.to_string())
 }

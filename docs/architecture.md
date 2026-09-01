@@ -91,6 +91,10 @@ All required branches must be satisfiable.
 
 At least one branch must be satisfiable. Unsuccessful branches remain in the diagnostic tree.
 
+### AND/OR combined
+
+`andor(A, B, C)` is satisfied if both `A` and `B` are satisfiable, or if `C` is satisfiable. It is evaluated as `combine_or(combine_and(A, B), C)` and its diagnostic node preserves all three children directly rather than synthesizing an intermediate AND node, so the tree matches what the user wrote.
+
 ### Threshold
 
 `thresh(k, ...)` reports whether at least `k` children can currently be satisfied.
