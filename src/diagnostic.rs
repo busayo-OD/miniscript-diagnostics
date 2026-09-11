@@ -173,6 +173,10 @@ impl Diagnostic {
                 output.push_str(reason);
                 output.push('\n');
             }
+        } else if let Some(reason) = &self.reason {
+            output.push_str(&detail_prefix);
+            output.push_str(reason);
+            output.push('\n');
         }
 
         for (key, value) in &self.metadata {

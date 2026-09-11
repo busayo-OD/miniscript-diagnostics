@@ -79,9 +79,32 @@ fn terminal_kind_name<Pk: MiniscriptKey, Ctx: ScriptContext>(
     match terminal {
         Terminal::True => "true".into(),
         Terminal::False => "false".into(),
+        Terminal::PkK(_) => "pk (key check)".into(),
+        Terminal::PkH(_) => "pkh (key hash check)".into(),
         Terminal::RawPkH(_) => "raw pkh (hash160 only)".into(),
+        Terminal::After(_) => "after (absolute timelock)".into(),
+        Terminal::Older(_) => "older (relative timelock)".into(),
+        Terminal::Sha256(_) => "sha256".into(),
+        Terminal::Hash256(_) => "hash256".into(),
+        Terminal::Ripemd160(_) => "ripemd160".into(),
+        Terminal::Hash160(_) => "hash160".into(),
+        Terminal::Alt(_) => "a: (Alt wrapper)".into(),
+        Terminal::Swap(_) => "s: (Swap wrapper)".into(),
+        Terminal::Check(_) => "c: (Check wrapper)".into(),
         Terminal::DupIf(_) => "d: (DupIf wrapper)".into(),
-        _ => "unrecognized fragment".into(),
+        Terminal::Verify(_) => "v: (Verify wrapper)".into(),
+        Terminal::NonZero(_) => "j: (NonZero wrapper)".into(),
+        Terminal::ZeroNotEqual(_) => "n: (ZeroNotEqual wrapper)".into(),
+        Terminal::AndV(_, _) => "and_v".into(),
+        Terminal::AndB(_, _) => "and_b".into(),
+        Terminal::AndOr(_, _, _) => "andor".into(),
+        Terminal::OrB(_, _) => "or_b".into(),
+        Terminal::OrD(_, _) => "or_d".into(),
+        Terminal::OrC(_, _) => "or_c".into(),
+        Terminal::OrI(_, _) => "or_i".into(),
+        Terminal::Thresh(_) => "thresh".into(),
+        Terminal::Multi(_) => "multi".into(),
+        Terminal::MultiA(_) => "multi_a".into(),
     }
 }
 
@@ -288,8 +311,37 @@ where
     let left_diagnostic = evaluate(left, ctx);
     let right_diagnostic = evaluate(right, ctx);
     let status = Status::combine_and(left_diagnostic.status, right_diagnostic.status);
+    let reason = and_reason(&left_diagnostic, &right_diagnostic);
 
     Diagnostic::combinator(label, status, vec![left_diagnostic, right_diagnostic])
+        .with_reason(reason)
+}
+
+fn and_reason(left: &Diagnostic, right: &Diagnostic) -> String {
+    match (left.status, right.status) {
+        (Status::Satisfied, Status::Satisfied) => {
+            "both required branches are currently satisfied".to_string()
+        }
+        (Status::Satisfied, _) => format!(
+            "{} is satisfied, but {} is not: {}",
+            left.fragment,
+            right.fragment,
+            right.reason.as_deref().unwrap_or("its status is blocking")
+        ),
+        (_, Status::Satisfied) => format!(
+            "{} is satisfied, but {} is not: {}",
+            right.fragment,
+            left.fragment,
+            left.reason.as_deref().unwrap_or("its status is blocking")
+        ),
+        _ => format!(
+            "neither required branch is currently satisfied: {} is not satisfied ({}), and {} is not satisfied ({})",
+            left.fragment,
+            left.reason.as_deref().unwrap_or("its status is blocking"),
+            right.fragment,
+            right.reason.as_deref().unwrap_or("its status is blocking"),
+        ),
+    }
 }
 
 /// Evaluates `andor(A, B, C)`: satisfied via `(A AND B)` or via `C`.
@@ -309,12 +361,50 @@ where
 
     let and_status = Status::combine_and(a_diagnostic.status, b_diagnostic.status);
     let status = Status::combine_or(and_status, c_diagnostic.status);
+    let reason = andor_reason(and_status, &a_diagnostic, &b_diagnostic, &c_diagnostic);
 
     Diagnostic::combinator(
         "ANDOR",
         status,
         vec![a_diagnostic, b_diagnostic, c_diagnostic],
     )
+    .with_reason(reason)
+}
+
+fn andor_reason(and_status: Status, a: &Diagnostic, b: &Diagnostic, c: &Diagnostic) -> String {
+    match (and_status, c.status) {
+        (Status::Satisfied, _) => format!("satisfied via {} and {}", a.fragment, b.fragment),
+        (_, Status::Satisfied) => format!("satisfied via the else-branch {}", c.fragment),
+
+        (Status::Unsupported, Status::Unsupported) => format!(
+            "cannot currently be evaluated: both the and-branch ({} and {}) and the else-branch {} are unsupported",
+            a.fragment, b.fragment, c.fragment
+        ),
+        (Status::Unsupported, _) => format!(
+            "cannot currently be evaluated: the and-branch ({} and {}) includes an unsupported fragment",
+            a.fragment, b.fragment
+        ),
+        (_, Status::Unsupported) => format!(
+            "cannot currently be evaluated: the else-branch {} is unsupported",
+            c.fragment
+        ),
+
+        (Status::Impossible, Status::Impossible) => {
+            "neither the and-branch nor the else-branch can be satisfied".to_string()
+        }
+        (Status::Unavailable, Status::Unavailable) => format!(
+            "not currently satisfied, but the and-branch ({} and {}) or the else-branch {} could still become available",
+            a.fragment, b.fragment, c.fragment
+        ),
+        (Status::Unavailable, Status::Impossible) => format!(
+            "not currently satisfied, but the and-branch ({} and {}) could still become available",
+            a.fragment, b.fragment
+        ),
+        (Status::Impossible, Status::Unavailable) => format!(
+            "not currently satisfied, but the else-branch {} could still become available",
+            c.fragment
+        ),
+    }
 }
 
 fn evaluate_or_i<Pk, Ctx>(
@@ -329,8 +419,58 @@ where
     let left_diagnostic = evaluate(left, ctx);
     let right_diagnostic = evaluate(right, ctx);
     let status = Status::combine_or(left_diagnostic.status, right_diagnostic.status);
+    let reason = or_reason(&left_diagnostic, &right_diagnostic);
 
     Diagnostic::combinator("OR_I", status, vec![left_diagnostic, right_diagnostic])
+        .with_reason(reason)
+}
+
+fn or_reason(left: &Diagnostic, right: &Diagnostic) -> String {
+    match (left.status, right.status) {
+        (Status::Satisfied, Status::Satisfied) => {
+            format!(
+                "satisfied via either {} or {}",
+                left.fragment, right.fragment
+            )
+        }
+        (Status::Satisfied, _) => format!("satisfied via {}", left.fragment),
+        (_, Status::Satisfied) => format!("satisfied via {}", right.fragment),
+
+        (Status::Unsupported, Status::Unsupported) => format!(
+            "cannot currently be evaluated: both {} and {} are unsupported fragments",
+            left.fragment, right.fragment
+        ),
+        (Status::Unsupported, _) => format!(
+            "cannot currently be evaluated: {} is unsupported ({})",
+            left.fragment,
+            left.reason
+                .as_deref()
+                .unwrap_or("outside this project's supported scope")
+        ),
+        (_, Status::Unsupported) => format!(
+            "cannot currently be evaluated: {} is unsupported ({})",
+            right.fragment,
+            right
+                .reason
+                .as_deref()
+                .unwrap_or("outside this project's supported scope")
+        ),
+
+        (Status::Impossible, Status::Impossible) => "neither branch can be satisfied".to_string(),
+
+        (Status::Unavailable, Status::Unavailable) => format!(
+            "no branch is currently satisfied, but {} or {} could still become available",
+            left.fragment, right.fragment
+        ),
+        (Status::Unavailable, Status::Impossible) => format!(
+            "no branch is currently satisfied, but {} could still become available",
+            left.fragment
+        ),
+        (Status::Impossible, Status::Unavailable) => format!(
+            "no branch is currently satisfied, but {} could still become available",
+            right.fragment
+        ),
+    }
 }
 
 /// Evaluates disjunctive fragments that require at least one side to be
@@ -348,8 +488,10 @@ where
     let left_diagnostic = evaluate(left, ctx);
     let right_diagnostic = evaluate(right, ctx);
     let status = Status::combine_or(left_diagnostic.status, right_diagnostic.status);
+    let reason = or_reason(&left_diagnostic, &right_diagnostic);
 
     Diagnostic::combinator(label, status, vec![left_diagnostic, right_diagnostic])
+        .with_reason(reason)
 }
 
 fn evaluate_thresh<Pk, Ctx>(
@@ -378,10 +520,27 @@ where
         .iter()
         .filter(|status| **status == Status::Satisfied)
         .count();
+    let reason = thresh_reason(k, n, satisfied, status);
 
     Diagnostic::combinator(format!("THRESH({k}, {n})"), status, children)
         .with_meta("required", k.to_string())
         .with_meta("satisfied", satisfied.to_string())
+        .with_reason(reason)
+}
+
+fn thresh_reason(k: usize, n: usize, satisfied: usize, status: Status) -> String {
+    let detail = match status {
+        Status::Satisfied => "requirement met".to_string(),
+        Status::Impossible => "not enough branches can ever be satisfied".to_string(),
+        Status::Unavailable => {
+            format!(
+                "{} more needed and still reachable",
+                k.saturating_sub(satisfied)
+            )
+        }
+        Status::Unsupported => "blocked by an unsupported branch".to_string(),
+    };
+    format!("{satisfied} of {k} required are satisfied ({n} total); {detail}")
 }
 
 fn evaluate_multi<Pk, const MAX: usize>(
@@ -407,8 +566,10 @@ where
         .iter()
         .filter(|status| **status == Status::Satisfied)
         .count();
+    let reason = thresh_reason(k, n, satisfied, status);
 
     Diagnostic::combinator(format!("{label}({k}, {n})"), status, children)
         .with_meta("required", k.to_string())
         .with_meta("satisfied", satisfied.to_string())
+        .with_reason(reason)
 }
