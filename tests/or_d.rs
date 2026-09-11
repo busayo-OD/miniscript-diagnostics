@@ -16,6 +16,11 @@ fn left_satisfied() {
     assert_eq!(diagnostic.children.len(), 2);
     assert_eq!(diagnostic.children[0].status, Status::Satisfied);
     assert_eq!(diagnostic.children[1].status, Status::Unavailable);
+    assert!(diagnostic
+        .reason
+        .as_deref()
+        .unwrap()
+        .contains("satisfied via"));
 }
 
 #[test]
@@ -27,6 +32,7 @@ fn right_satisfied() {
     assert_eq!(diagnostic.status, Status::Satisfied);
     assert_eq!(diagnostic.children[0].status, Status::Impossible);
     assert_eq!(diagnostic.children[1].status, Status::Satisfied);
+    assert!(diagnostic.reason.as_deref().unwrap().contains("older(144)"));
 }
 
 #[test]

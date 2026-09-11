@@ -25,6 +25,10 @@ fn exactly_k_satisfiable() {
         .with_key(key(KEY_B));
     let diagnostic = parse_and_evaluate(&thresh_str(2), &context).unwrap();
     assert_eq!(diagnostic.status, Status::Satisfied);
+    assert_eq!(
+        diagnostic.reason.as_deref().unwrap(),
+        "2 of 2 required are satisfied (3 total); requirement met"
+    );
 }
 
 #[test]
@@ -35,6 +39,10 @@ fn more_than_k_satisfiable() {
         .with_key(key(KEY_C));
     let diagnostic = parse_and_evaluate(&thresh_str(2), &context).unwrap();
     assert_eq!(diagnostic.status, Status::Satisfied);
+    assert_eq!(
+        diagnostic.reason.as_deref().unwrap(),
+        "3 of 2 required are satisfied (3 total); requirement met"
+    );
 }
 
 #[test]

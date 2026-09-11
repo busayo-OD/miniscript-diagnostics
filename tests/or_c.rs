@@ -21,6 +21,7 @@ fn left_satisfied() {
     assert_eq!(or_c.children.len(), 2);
     assert_eq!(or_c.children[0].status, Status::Satisfied);
     assert_eq!(or_c.children[1].status, Status::Unavailable);
+    assert!(or_c.reason.as_deref().unwrap().contains("satisfied via"));
 }
 
 #[test]

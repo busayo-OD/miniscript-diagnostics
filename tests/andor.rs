@@ -9,12 +9,17 @@ fn key(s: &str) -> PublicKey {
 }
 
 #[test]
-fn and_branch_satisfied() {
+fn falls_through_to_else_branch_when_and_branch_blocked() {
     let context: DiagnosticContext<_> = DiagnosticContext::new().with_key(key(KEY_A));
     let expr = format!("andor(pk({KEY_A}),older(1),pk({KEY_A}))");
     let diagnostic = parse_and_evaluate(&expr, &context).unwrap();
 
     assert_eq!(diagnostic.children.len(), 3);
+    assert!(diagnostic
+        .reason
+        .as_deref()
+        .unwrap()
+        .contains("satisfied via the else-branch"));
 }
 
 #[test]
@@ -27,6 +32,11 @@ fn c_branch_satisfied() {
     assert_eq!(diagnostic.children[1].status, Status::Unavailable);
     assert_eq!(diagnostic.children[2].status, Status::Satisfied);
     assert_eq!(diagnostic.status, Status::Satisfied);
+    assert!(diagnostic
+        .reason
+        .as_deref()
+        .unwrap()
+        .contains("satisfied via the else-branch"));
 }
 
 #[test]
@@ -36,6 +46,10 @@ fn both_paths_impossible() {
     let diagnostic = parse_and_evaluate(&expr, &context).unwrap();
 
     assert_eq!(diagnostic.status, Status::Impossible);
+    assert_eq!(
+        diagnostic.reason.as_deref().unwrap(),
+        "neither the and-branch nor the else-branch can be satisfied"
+    );
 }
 
 #[test]

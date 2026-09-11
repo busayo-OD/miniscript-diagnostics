@@ -115,3 +115,23 @@ fn round_trips_through_status_display_values() {
         "unsupported"
     );
 }
+
+#[test]
+fn combinator_reason_serializes() {
+    let context: DiagnosticContext<_> = DiagnosticContext::new().with_key(key(KEY_A));
+    let miniscript = format!("or_i(and_v(v:pk({KEY_A}),older(144)),pk({KEY_B}))");
+    let diagnostic = parse_and_evaluate(&miniscript, &context).unwrap();
+
+    let json: serde_json::Value = serde_json::to_value(&diagnostic).unwrap();
+    assert_eq!(json["fragment"], "OR_I");
+    assert!(json["reason"].is_string());
+    assert!(json["reason"]
+        .as_str()
+        .unwrap()
+        .contains("could still become available"));
+
+    let and_v = &json["children"][0];
+    assert_eq!(and_v["fragment"], "AND_V");
+    assert!(and_v["reason"].is_string());
+    assert!(and_v["reason"].as_str().unwrap().contains("older(144)"));
+}

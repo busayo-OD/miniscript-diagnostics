@@ -23,6 +23,10 @@ fn exactly_k_satisfiable() {
     let diagnostic = evaluate(&miniscript, &context);
 
     assert_eq!(diagnostic.status, Status::Satisfied);
+    assert_eq!(
+        diagnostic.reason.as_deref().unwrap(),
+        "2 of 2 required are satisfied (3 total); requirement met"
+    );
 }
 
 #[test]
@@ -34,6 +38,10 @@ fn fewer_than_k_satisfiable_is_impossible() {
     assert_eq!(diagnostic.status, Status::Impossible);
     assert!(diagnostic.metadata.iter().any(|(k, _)| k == "required"));
     assert!(diagnostic.metadata.iter().any(|(k, _)| k == "satisfied"));
+    assert_eq!(
+        diagnostic.reason.as_deref().unwrap(),
+        "1 of 2 required are satisfied (3 total); not enough branches can ever be satisfied"
+    );
 }
 
 #[test]

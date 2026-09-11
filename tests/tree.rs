@@ -110,3 +110,84 @@ fn thresh_nested_inside_and_v_preserves_children() {
     );
     assert_eq!(thresh_branch.status, Status::Satisfied);
 }
+
+#[test]
+fn combinator_reasons_are_populated_and_rendered() {
+    let context: DiagnosticContext<_> = DiagnosticContext::new().with_key(key(KEY_A));
+    let miniscript = format!("or_i(and_v(v:pk({KEY_A}),older(144)),pk({KEY_B}))");
+    let diagnostic = parse_and_evaluate(&miniscript, &context).unwrap();
+
+    assert_eq!(diagnostic.status, Status::Unavailable);
+    assert!(diagnostic.reason.is_some());
+    let or_i_reason = diagnostic.reason.as_deref().unwrap();
+    assert!(or_i_reason.contains("could still become available"));
+
+    let and_v_branch = &diagnostic.children[0];
+    assert!(and_v_branch.reason.is_some());
+    let and_v_reason = and_v_branch.reason.as_deref().unwrap();
+    assert!(and_v_reason.contains("older("));
+
+    // reason text must appear in rendered output, not just the struct
+    let rendered = diagnostic.render();
+    assert!(rendered.contains(or_i_reason));
+    assert!(rendered.contains(and_v_reason));
+}
+
+#[test]
+fn and_v_neither_side_satisfied_names_both_blockers() {
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+    let diagnostic =
+        parse_and_evaluate(&format!("and_v(v:pk({KEY_A}),older(144))"), &context).unwrap();
+
+    assert_eq!(diagnostic.status, Status::Impossible);
+    let reason = diagnostic.reason.as_deref().unwrap();
+    assert!(reason.contains("pk("));
+    assert!(reason.contains("older(144)"));
+    assert!(reason.contains("no signature is available"));
+    assert!(reason.contains("has not yet matured"));
+}
+
+#[test]
+fn and_v_with_unsupported_child_names_it_specifically() {
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+    let diagnostic = parse_and_evaluate("and_v(v:older(144),1)", &context).unwrap();
+
+    assert_eq!(diagnostic.status, Status::Unsupported);
+    let reason = diagnostic.reason.as_deref().unwrap();
+    assert!(reason.contains("true"));
+    assert!(reason.contains("outside this project's supported"));
+}
+
+#[test]
+fn or_i_both_unavailable_names_both_pending_branches() {
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+    let diagnostic = parse_and_evaluate("or_i(older(100),older(200))", &context).unwrap();
+
+    assert_eq!(diagnostic.status, Status::Unavailable);
+    let reason = diagnostic.reason.as_deref().unwrap();
+    assert!(reason.contains("older(100)"));
+    assert!(reason.contains("older(200)"));
+}
+
+#[test]
+fn or_i_with_unsupported_branch_is_not_reported_as_pending() {
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+    let diagnostic = parse_and_evaluate("or_i(older(144),1)", &context).unwrap();
+
+    assert_eq!(diagnostic.status, Status::Unsupported);
+    let reason = diagnostic.reason.as_deref().unwrap();
+    assert!(reason.contains("true"));
+    assert!(!reason.contains("could still become available"));
+}
+
+#[test]
+fn andor_with_unsupported_else_branch_names_it() {
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+    let diagnostic =
+        parse_and_evaluate(&format!("andor(pk({KEY_A}),older(1),1)"), &context).unwrap();
+
+    assert_eq!(diagnostic.status, Status::Unsupported);
+    let reason = diagnostic.reason.as_deref().unwrap();
+    assert!(reason.contains("true"));
+    assert!(reason.contains("else-branch"));
+}
