@@ -2,7 +2,7 @@
 
 A Rust library and CLI that explains Miniscript satisfaction state under a supplied spending context.
 
-It walks the public `rust-miniscript` AST and produces a diagnostic tree showing why each supported fragment is `SATISFIED`, `UNAVAILABLE`, or `IMPOSSIBLE`. Fragments outside the supported set are reported as `UNSUPPORTED`.
+It walks the public `rust-miniscript` AST and produces a diagnostic tree showing why each supported fragment is `SATISFIED`, `UNAVAILABLE`, or `IMPOSSIBLE`. Fragments outside the supported set are reported as `UNSUPPORTED`. Each diagnostic node includes a reason when applicable, explaining why that status was reached.
 
 ## Example
 
@@ -20,11 +20,17 @@ ROOT STATUS: UNAVAILABLE
 ## Supported
 
 * `pk`, `pkh`
+
 * `sha256`, `hash256`, `ripemd160`, `hash160`
+
 * `after`, `older`
+
 * `and_v`, `and_b`, `or_i`
-* `or_b`, `andor`
-* `thresh(k, ...)`
+
+* `or_b`, `or_c`, `or_d`, `andor`
+
+* `thresh(k, ...)`, `multi`, `multi_a`
+
 
 ## Usage
 

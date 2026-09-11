@@ -38,7 +38,7 @@ Provides the spending context used during evaluation:
 
 ### `evaluator.rs`
 
-Recursively walks the public Miniscript AST and evaluates supported fragments. It does not perform signing, witness generation, transaction construction, or signature verification.
+Recursively walks the public Miniscript AST, evaluates supported fragments, and generates diagnostic reasons explaining their current status. It does not perform signing, witness generation, transaction construction, or signature verification.
 
 ### `diagnostic.rs`
 
@@ -49,6 +49,7 @@ Defines the diagnostic model:
 * metadata
 * child diagnostics
 * status-combination logic
+* diagnostic reasons
 * rendering
 
 The diagnostic tree is public so applications can consume it directly.
@@ -81,7 +82,7 @@ The fragment is outside the supported scope of the evaluator. This is a project-
 
 ## Evaluation
 
-The evaluator handles supported leaves and combinators recursively. Child diagnostics are preserved so the result explains both the root status and the state of each branch.
+The evaluator handles supported leaves and combinators recursively. Child diagnostics are preserved so the result explains both the root status and the state of each branch. Combinator diagnostics also include reasons describing why the resulting status was reached.
 
 ### AND
 
