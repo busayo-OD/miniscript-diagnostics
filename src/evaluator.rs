@@ -69,7 +69,7 @@ where
     Diagnostic::leaf(
         name.clone(),
         Status::Unsupported,
-        format!("the `{name}` fragment is outside this project's supported MVP scope"),
+        format!("the `{name}` fragment is not currently supported"),
     )
 }
 
