@@ -155,7 +155,7 @@ fn and_v_with_unsupported_child_names_it_specifically() {
     assert_eq!(diagnostic.status, Status::Unsupported);
     let reason = diagnostic.reason.as_deref().unwrap();
     assert!(reason.contains("true"));
-    assert!(reason.contains("outside this project's supported"));
+    assert!(reason.contains("not currently supported"));
 }
 
 #[test]
