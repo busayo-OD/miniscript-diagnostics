@@ -443,17 +443,12 @@ fn or_reason(left: &Diagnostic, right: &Diagnostic) -> String {
         (Status::Unsupported, _) => format!(
             "cannot currently be evaluated: {} is unsupported ({})",
             left.fragment,
-            left.reason
-                .as_deref()
-                .unwrap_or("not currently supported")
+            left.reason.as_deref().unwrap_or("not currently supported")
         ),
         (_, Status::Unsupported) => format!(
             "cannot currently be evaluated: {} is unsupported ({})",
             right.fragment,
-            right
-                .reason
-                .as_deref()
-                .unwrap_or("not currently supported")
+            right.reason.as_deref().unwrap_or("not currently supported")
         ),
 
         (Status::Impossible, Status::Impossible) => "neither branch can be satisfied".to_string(),
