@@ -20,7 +20,7 @@ fn satisfied_leaf_serializes() {
     assert_eq!(json["fragment"], diagnostic.fragment);
     assert_eq!(
         json["reason"],
-        "the required signing key is available in the supplied context"
+        format!("a key for {KEY_A} was supplied in the context")
     );
     assert_eq!(json["children"], serde_json::json!([]));
 }
@@ -47,7 +47,7 @@ fn impossible_leaf_serializes() {
     assert_eq!(json["status"], "impossible");
     assert_eq!(
         json["reason"],
-        "no signature is available for the required key, and signatures cannot be forged"
+        format!("no key for {KEY_A} was supplied in the context")
     );
 }
 
@@ -134,4 +134,18 @@ fn combinator_reason_serializes() {
     assert_eq!(and_v["fragment"], "AND_V");
     assert!(and_v["reason"].is_string());
     assert!(and_v["reason"].as_str().unwrap().contains("older(144)"));
+}
+
+#[test]
+fn unsupported_combinator_reason_matches_json_and_render() {
+    let context: DiagnosticContext<bitcoin::PublicKey> = DiagnosticContext::new();
+    let diagnostic = parse_and_evaluate("and_v(v:older(144),1)", &context).unwrap();
+
+    let json: serde_json::Value = serde_json::to_value(&diagnostic).unwrap();
+    assert_eq!(json["status"], "unsupported");
+    let reason = json["reason"].as_str().unwrap();
+    assert!(reason.starts_with("cannot currently be evaluated"));
+    assert!(reason.contains("not currently supported"));
+    assert_eq!(Some(reason), diagnostic.reason.as_deref());
+    assert!(diagnostic.render().contains(reason));
 }

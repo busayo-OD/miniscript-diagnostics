@@ -143,7 +143,7 @@ fn and_v_neither_side_satisfied_names_both_blockers() {
     let reason = diagnostic.reason.as_deref().unwrap();
     assert!(reason.contains("pk("));
     assert!(reason.contains("older(144)"));
-    assert!(reason.contains("no signature is available"));
+    assert!(reason.contains("no key for"));
     assert!(reason.contains("has not yet matured"));
 }
 

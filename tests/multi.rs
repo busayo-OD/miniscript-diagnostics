@@ -22,7 +22,7 @@ fn exactly_k_satisfiable() {
     assert_eq!(diagnostic.status, Status::Satisfied);
     assert_eq!(
         diagnostic.reason.as_deref().unwrap(),
-        "2 of 2 required are satisfied (3 total); requirement met"
+        "2 of 3 keys satisfied; 2 required; requirement met"
     );
 }
 
@@ -35,7 +35,10 @@ fn fewer_than_k_satisfiable_is_impossible() {
     assert!(diagnostic.metadata.iter().any(|(k, _)| k == "satisfied"));
     assert_eq!(
         diagnostic.reason.as_deref().unwrap(),
-        "1 of 2 required are satisfied (3 total); not enough branches can ever be satisfied"
+        format!(
+            "1 of 3 keys satisfied; 2 required; not enough remain possible in the current context (impossible: pk({KEY_B}), pk({KEY_C}))"
+        )
+        .as_str()
     );
 }
 

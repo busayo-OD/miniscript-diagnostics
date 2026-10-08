@@ -154,7 +154,7 @@ fn reason_text_pk_satisfied() {
     let diagnostic = parse_and_evaluate(&format!("pk({KEY_A})"), &context).unwrap();
     assert_eq!(
         diagnostic.reason.as_deref(),
-        Some("the required signing key is available in the supplied context")
+        Some(format!("a key for {KEY_A} was supplied in the context").as_str())
     );
 }
 
@@ -164,7 +164,7 @@ fn reason_text_pk_impossible() {
     let diagnostic = parse_and_evaluate(&format!("pk({KEY_A})"), &context).unwrap();
     assert_eq!(
         diagnostic.reason.as_deref(),
-        Some("no signature is available for the required key, and signatures cannot be forged")
+        Some(format!("no key for {KEY_A} was supplied in the context").as_str())
     );
 }
 

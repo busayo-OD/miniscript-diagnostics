@@ -27,7 +27,7 @@ fn exactly_k_satisfiable() {
     assert_eq!(diagnostic.status, Status::Satisfied);
     assert_eq!(
         diagnostic.reason.as_deref().unwrap(),
-        "2 of 2 required are satisfied (3 total); requirement met"
+        "2 of 3 conditions satisfied; 2 required; requirement met"
     );
 }
 
@@ -41,7 +41,7 @@ fn more_than_k_satisfiable() {
     assert_eq!(diagnostic.status, Status::Satisfied);
     assert_eq!(
         diagnostic.reason.as_deref().unwrap(),
-        "3 of 2 required are satisfied (3 total); requirement met"
+        "3 of 3 conditions satisfied; 2 required; requirement met"
     );
 }
 

@@ -46,10 +46,12 @@ fn both_paths_impossible() {
     let diagnostic = parse_and_evaluate(&expr, &context).unwrap();
 
     assert_eq!(diagnostic.status, Status::Impossible);
-    assert_eq!(
-        diagnostic.reason.as_deref().unwrap(),
-        "neither the and-branch nor the else-branch can be satisfied"
-    );
+
+    let reason = diagnostic.reason.as_deref().unwrap();
+    assert!(reason.starts_with("no branch is currently satisfied"));
+    assert!(reason.contains("and-branch"));
+    assert!(reason.contains("else-branch"));
+    assert!(reason.contains(&format!("no key for {KEY_A} was supplied in the context")));
 }
 
 #[test]
