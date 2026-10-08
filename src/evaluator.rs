@@ -114,12 +114,12 @@ fn evaluate_pk<Pk: MiniscriptKey>(label: &str, pk: &Pk, ctx: &DiagnosticContext<
     let (status, reason) = if available {
         (
             Status::Satisfied,
-            "the required signing key is available in the supplied context",
+            format!("a key for {pk} was supplied in the context"),
         )
     } else {
         (
             Status::Impossible,
-            "no signature is available for the required key, and signatures cannot be forged",
+            format!("no key for {pk} was supplied in the context"),
         )
     };
 
@@ -317,30 +317,61 @@ where
         .with_reason(reason)
 }
 
+fn describe(diagnostic: &Diagnostic) -> String {
+    let predicate = match diagnostic.status {
+        Status::Satisfied => "is satisfied",
+        Status::Unavailable => "is unavailable",
+        Status::Impossible => "is impossible in the current context",
+        Status::Unsupported => "cannot currently be evaluated",
+    };
+
+    match (&diagnostic.reason, diagnostic.children.is_empty()) {
+        (Some(reason), true) => format!("{} {predicate} ({reason})", diagnostic.fragment),
+        _ => format!("{} {predicate}", diagnostic.fragment),
+    }
+}
+
+fn pending(diagnostic: &Diagnostic) -> String {
+    match (&diagnostic.reason, diagnostic.children.is_empty()) {
+        (Some(reason), true) => format!(
+            "{} could still become available ({reason})",
+            diagnostic.fragment
+        ),
+        _ => format!("{} could still become available", diagnostic.fragment),
+    }
+}
+
+fn both(left: &Diagnostic, right: &Diagnostic) -> String {
+    format!("{} and {}", describe(left), describe(right))
+}
+
+fn describe_where(children: &[&Diagnostic], status: Status) -> String {
+    children
+        .iter()
+        .filter(|child| child.status == status)
+        .map(|child| describe(child))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+fn fragments_where(children: &[&Diagnostic], status: Status) -> String {
+    children
+        .iter()
+        .filter(|child| child.status == status)
+        .map(|child| child.fragment.clone())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn and_reason(left: &Diagnostic, right: &Diagnostic) -> String {
-    match (left.status, right.status) {
-        (Status::Satisfied, Status::Satisfied) => {
-            "both required branches are currently satisfied".to_string()
+    match Status::combine_and(left.status, right.status) {
+        Status::Satisfied => "both required branches are currently satisfied".to_string(),
+        Status::Unsupported => {
+            format!("cannot currently be evaluated: {}", both(left, right))
         }
-        (Status::Satisfied, _) => format!(
-            "{} is satisfied, but {} is not: {}",
-            left.fragment,
-            right.fragment,
-            right.reason.as_deref().unwrap_or("its status is blocking")
-        ),
-        (_, Status::Satisfied) => format!(
-            "{} is satisfied, but {} is not: {}",
-            right.fragment,
-            left.fragment,
-            left.reason.as_deref().unwrap_or("its status is blocking")
-        ),
-        _ => format!(
-            "neither required branch is currently satisfied: {} is not satisfied ({}), and {} is not satisfied ({})",
-            left.fragment,
-            left.reason.as_deref().unwrap_or("its status is blocking"),
-            right.fragment,
-            right.reason.as_deref().unwrap_or("its status is blocking"),
-        ),
+        Status::Unavailable | Status::Impossible => {
+            format!("not currently satisfied: {}", both(left, right))
+        }
     }
 }
 
@@ -376,33 +407,31 @@ fn andor_reason(and_status: Status, a: &Diagnostic, b: &Diagnostic, c: &Diagnost
         (Status::Satisfied, _) => format!("satisfied via {} and {}", a.fragment, b.fragment),
         (_, Status::Satisfied) => format!("satisfied via the else-branch {}", c.fragment),
 
-        (Status::Unsupported, Status::Unsupported) => format!(
-            "cannot currently be evaluated: both the and-branch ({} and {}) and the else-branch {} are unsupported",
-            a.fragment, b.fragment, c.fragment
-        ),
-        (Status::Unsupported, _) => format!(
-            "cannot currently be evaluated: the and-branch ({} and {}) includes an unsupported fragment",
-            a.fragment, b.fragment
-        ),
-        (_, Status::Unsupported) => format!(
-            "cannot currently be evaluated: the else-branch {} is unsupported",
-            c.fragment
+        (Status::Unsupported, _) | (_, Status::Unsupported) => format!(
+            "cannot currently be evaluated: and-branch: {}; else-branch: {}",
+            both(a, b),
+            describe(c)
         ),
 
-        (Status::Impossible, Status::Impossible) => {
-            "neither the and-branch nor the else-branch can be satisfied".to_string()
-        }
+        (Status::Impossible, Status::Impossible) => format!(
+            "no branch is currently satisfied: and-branch: {}; else-branch: {}",
+            both(a, b),
+            describe(c)
+        ),
         (Status::Unavailable, Status::Unavailable) => format!(
             "not currently satisfied, but the and-branch ({} and {}) or the else-branch {} could still become available",
             a.fragment, b.fragment, c.fragment
         ),
         (Status::Unavailable, Status::Impossible) => format!(
-            "not currently satisfied, but the and-branch ({} and {}) could still become available",
-            a.fragment, b.fragment
+            "not currently satisfied, but the and-branch ({} and {}) could still become available, while the else-branch {}",
+            a.fragment,
+            b.fragment,
+            describe(c)
         ),
         (Status::Impossible, Status::Unavailable) => format!(
-            "not currently satisfied, but the else-branch {} could still become available",
-            c.fragment
+            "not currently satisfied, but {}, while the and-branch is impossible in the current context: {}",
+            pending(c),
+            describe_where(&[a, b], Status::Impossible)
         ),
     }
 }
@@ -427,43 +456,33 @@ where
 
 fn or_reason(left: &Diagnostic, right: &Diagnostic) -> String {
     match (left.status, right.status) {
-        (Status::Satisfied, Status::Satisfied) => {
-            format!(
-                "satisfied via either {} or {}",
-                left.fragment, right.fragment
-            )
-        }
+        (Status::Satisfied, Status::Satisfied) => format!(
+            "satisfied via either {} or {}",
+            left.fragment, right.fragment
+        ),
         (Status::Satisfied, _) => format!("satisfied via {}", left.fragment),
         (_, Status::Satisfied) => format!("satisfied via {}", right.fragment),
 
-        (Status::Unsupported, Status::Unsupported) => format!(
-            "cannot currently be evaluated: both {} and {} are unsupported fragments",
-            left.fragment, right.fragment
-        ),
-        (Status::Unsupported, _) => format!(
-            "cannot currently be evaluated: {} is unsupported ({})",
-            left.fragment,
-            left.reason.as_deref().unwrap_or("not currently supported")
-        ),
-        (_, Status::Unsupported) => format!(
-            "cannot currently be evaluated: {} is unsupported ({})",
-            right.fragment,
-            right.reason.as_deref().unwrap_or("not currently supported")
-        ),
+        (Status::Unsupported, _) | (_, Status::Unsupported) => {
+            format!("cannot currently be evaluated: {}", both(left, right))
+        }
 
-        (Status::Impossible, Status::Impossible) => "neither branch can be satisfied".to_string(),
-
+        (Status::Impossible, Status::Impossible) => {
+            format!("no branch is currently satisfied: {}", both(left, right))
+        }
         (Status::Unavailable, Status::Unavailable) => format!(
             "no branch is currently satisfied, but {} or {} could still become available",
             left.fragment, right.fragment
         ),
         (Status::Unavailable, Status::Impossible) => format!(
-            "no branch is currently satisfied, but {} could still become available",
-            left.fragment
+            "no branch is currently satisfied: {}, while {}",
+            pending(left),
+            describe(right)
         ),
         (Status::Impossible, Status::Unavailable) => format!(
-            "no branch is currently satisfied, but {} could still become available",
-            right.fragment
+            "no branch is currently satisfied: {}, while {}",
+            pending(right),
+            describe(left)
         ),
     }
 }
@@ -515,7 +534,7 @@ where
         .iter()
         .filter(|status| **status == Status::Satisfied)
         .count();
-    let reason = thresh_reason(k, n, satisfied, status);
+    let reason = thresh_reason("conditions", k, &children, status);
 
     Diagnostic::combinator(format!("THRESH({k}, {n})"), status, children)
         .with_meta("required", k.to_string())
@@ -523,19 +542,33 @@ where
         .with_reason(reason)
 }
 
-fn thresh_reason(k: usize, n: usize, satisfied: usize, status: Status) -> String {
+fn thresh_reason(child_label: &str, k: usize, children: &[Diagnostic], status: Status) -> String {
+    let n = children.len();
+    let satisfied = children
+        .iter()
+        .filter(|child| child.status == Status::Satisfied)
+        .count();
+    let refs: Vec<&Diagnostic> = children.iter().collect();
+
+    let summary = format!("{satisfied} of {n} {child_label} satisfied; {k} required");
     let detail = match status {
         Status::Satisfied => "requirement met".to_string(),
-        Status::Impossible => "not enough branches can ever be satisfied".to_string(),
-        Status::Unavailable => {
-            format!(
-                "{} more needed and still reachable",
-                k.saturating_sub(satisfied)
-            )
-        }
-        Status::Unsupported => "blocked by an unsupported branch".to_string(),
+        Status::Unavailable => format!(
+            "{} more needed and still reachable via: {}",
+            k.saturating_sub(satisfied),
+            fragments_where(&refs, Status::Unavailable)
+        ),
+        Status::Impossible => format!(
+            "not enough remain possible in the current context (impossible: {})",
+            fragments_where(&refs, Status::Impossible)
+        ),
+        Status::Unsupported => format!(
+            "cannot currently be fully evaluated: {}",
+            describe_where(&refs, Status::Unsupported)
+        ),
     };
-    format!("{satisfied} of {k} required are satisfied ({n} total); {detail}")
+
+    format!("{summary}; {detail}")
 }
 
 fn evaluate_multi<Pk, const MAX: usize>(
@@ -561,7 +594,7 @@ where
         .iter()
         .filter(|status| **status == Status::Satisfied)
         .count();
-    let reason = thresh_reason(k, n, satisfied, status);
+    let reason = thresh_reason("keys", k, &children, status);
 
     Diagnostic::combinator(format!("{label}({k}, {n})"), status, children)
         .with_meta("required", k.to_string())
