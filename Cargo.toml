@@ -1,9 +1,12 @@
 [package]
 name = "miniscript-diagnostics"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition = "2021"
-description = "A diagnostic/explanation layer over rust-miniscript: explains Miniscript satisfaction state under a supplied spending context."
+description = "Diagnostics for Miniscript satisfaction under a supplied spending context."
 license = "CC0-1.0"
+repository = "https://github.com/busayo-OD/miniscript-diagnostics"
+readme = "README.md"
+keywords = ["bitcoin", "miniscript"]
 
 [lib]
 name = "miniscript_diagnostics"
