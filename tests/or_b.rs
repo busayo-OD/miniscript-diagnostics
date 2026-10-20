@@ -66,3 +66,22 @@ fn or_b_matches_or_i_status_semantics() {
 
     assert_eq!(or_b.status, or_i.status);
 }
+
+const HASH32_A: &str = "6c60f404f8167a38fc70eaf8aa17ac351023bef86bcb9d1086a19afe95bd5330";
+const HASH32_B: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+#[test]
+fn both_unavailable_names_both_pending_branches() {
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+    let expr = format!("or_b(sha256({HASH32_A}),s:sha256({HASH32_B}))");
+    let diagnostic = parse_and_evaluate(&expr, &context).unwrap();
+
+    assert_eq!(diagnostic.fragment, "OR_B");
+    assert_eq!(diagnostic.status, Status::Unavailable);
+    assert_eq!(diagnostic.children[0].status, Status::Unavailable);
+    assert_eq!(diagnostic.children[1].status, Status::Unavailable);
+
+    let reason = diagnostic.reason.as_deref().unwrap();
+    assert!(reason.starts_with("no branch is currently satisfied, but sha256("));
+    assert!(reason.ends_with("could still become available"));
+}

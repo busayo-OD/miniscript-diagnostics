@@ -65,3 +65,64 @@ fn children_preserved_in_order() {
     assert!(diagnostic.children[1].fragment.starts_with("older("));
     assert!(diagnostic.children[2].fragment.starts_with("older("));
 }
+
+const HASH32_A: &str = "6c60f404f8167a38fc70eaf8aa17ac351023bef86bcb9d1086a19afe95bd5330";
+
+#[test]
+fn and_branch_satisfied_takes_precedence_over_satisfied_else_branch() {
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new()
+        .with_key(key(KEY_A))
+        .with_key(key(KEY_B));
+    let expr = format!("andor(pk({KEY_A}),pk({KEY_B}),pk({KEY_A}))");
+    let diagnostic = parse_and_evaluate(&expr, &context).unwrap();
+
+    assert_eq!(diagnostic.fragment, "ANDOR");
+    assert_eq!(diagnostic.status, Status::Satisfied);
+    assert!(diagnostic
+        .children
+        .iter()
+        .all(|child| child.status == Status::Satisfied));
+    assert_eq!(
+        diagnostic.reason.as_deref().unwrap(),
+        format!("satisfied via pk({KEY_A}) and pk({KEY_B})").as_str()
+    );
+}
+
+#[test]
+fn and_branch_and_else_branch_both_unavailable() {
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new().with_key(key(KEY_A));
+    let expr = format!("andor(pk({KEY_A}),older(1),sha256({HASH32_A}))");
+    let diagnostic = parse_and_evaluate(&expr, &context).unwrap();
+
+    assert_eq!(diagnostic.status, Status::Unavailable);
+    assert_eq!(diagnostic.children[0].status, Status::Satisfied);
+    assert_eq!(diagnostic.children[1].status, Status::Unavailable);
+    assert_eq!(diagnostic.children[2].status, Status::Unavailable);
+
+    let reason = diagnostic.reason.as_deref().unwrap();
+    assert!(reason.starts_with("not currently satisfied, but the and-branch (pk("));
+    assert!(reason.contains("older(1)"));
+    assert!(reason.contains("or the else-branch sha256("));
+    assert!(reason.ends_with("could still become available"));
+}
+
+#[test]
+fn and_n_is_unsupported_unless_its_and_branch_is_satisfied() {
+    // Known limitation, pinned deliberately: `and_n(X,Y)` is `andor(X,Y,0)` and
+    // the `0` fragment is not supported. Unless the and-branch is satisfied,
+    // the result is UNSUPPORTED rather than UNAVAILABLE or IMPOSSIBLE.
+    // If `0` support is added later, update this test with that change.
+    let expr = format!("and_n(pk({KEY_A}),older(1))");
+
+    let satisfied_context: DiagnosticContext<PublicKey> = DiagnosticContext::new()
+        .with_key(key(KEY_A))
+        .with_elapsed_blocks(miniscript::bitcoin::relative::Height::from(1u16));
+    let satisfied = parse_and_evaluate(&expr, &satisfied_context).unwrap();
+    assert_eq!(satisfied.status, Status::Satisfied);
+
+    let empty_context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+    let unsupported = parse_and_evaluate(&expr, &empty_context).unwrap();
+    assert_eq!(unsupported.status, Status::Unsupported);
+    assert_eq!(unsupported.children[2].fragment, "false");
+    assert_eq!(unsupported.children[2].status, Status::Unsupported);
+}
