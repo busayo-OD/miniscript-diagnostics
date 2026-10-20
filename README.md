@@ -6,15 +6,17 @@ It walks the public `rust-miniscript` AST and produces a diagnostic tree showing
 
 This tool explains satisfaction feasibility under a supplied context; it does not generate witnesses or sign transactions.
 
+For details on the design and evaluation flow, see the [Architecture documentation](docs/architecture.md).
+
 ## Example
 
 ```text
 AND_V [UNAVAILABLE]
-├── pk(...) [SATISFIED]
-└── older(144) [UNAVAILABLE]
-    required: 144 blocks
-    available: 83 blocks
-    remaining: 61 blocks
+    PK [SATISFIED]
+    OLDER [UNAVAILABLE]
+        required: 144 blocks
+        available: 83 blocks
+        remaining: 61 blocks
 
 ROOT STATUS: UNAVAILABLE
 ```
@@ -70,10 +72,20 @@ In this example, the overall expression is `Satisfied`. The first branch is `Sat
 
 ## Development
 
-Run the test suite with:
+Install [Just](https://just.systems/) to run the project's development commands.
 
 ```bash
-cargo test
+just p
 ```
 
-See [Architecture](docs/architecture.md) for design details.
+This runs the pre-push checks, including formatting, compilation, linting, tests, and documentation checks.
+
+See the [justfile](justfile) for all available commands.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
+## License
+
+This project is licensed under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/). See [LICENSE](LICENSE) for details.

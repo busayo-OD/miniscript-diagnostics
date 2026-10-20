@@ -112,12 +112,14 @@ Parsing and type checking are delegated to `rust-miniscript`. The CLI uses `from
 
 ## Scope
 
-The current version does not implement:
+The current version does not yet support:
 
-* Taproot
-* witness generation
-* signing
-* transaction construction
-* PSBT handling
-* witness optimization
-* signature verification
+- General Taproot/Tapscript parsing and evaluation through the public API and CLI
+- Witness generation
+- Signing
+- Transaction construction
+- PSBT handling
+- Witness optimization
+- Signature verification
+
+The evaluator does support `multi_a` when given a Miniscript AST using the Tap context. General Taproot/Tapscript support remains future work.
