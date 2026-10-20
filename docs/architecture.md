@@ -33,7 +33,7 @@ Provides the spending context used during evaluation:
 
 * available keys
 * available preimages
-* chain height and time
+* chain height and time (an `after` lock is only checked against the matching value: a height lock needs a chain height and a time lock needs a chain time; a missing value leaves the lock `UNAVAILABLE`)
 * relative timelock state
 
 ### `evaluator.rs`
