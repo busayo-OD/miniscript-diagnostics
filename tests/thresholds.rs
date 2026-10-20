@@ -11,11 +11,7 @@ fn key(s: &str) -> PublicKey {
 }
 
 fn thresh_str(k: usize) -> String {
-    let script = format!(
-        "thresh({},pk({}),s:pk({}),s:pk({}))",
-        k, KEY_A, KEY_B, KEY_C
-    );
-    script
+    format!("thresh({k},pk({KEY_A}),s:pk({KEY_B}),s:pk({KEY_C}))")
 }
 
 #[test]
