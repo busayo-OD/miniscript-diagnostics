@@ -112,9 +112,19 @@ impl<Pk: MiniscriptKey> DiagnosticContext<Pk> {
         lock_time.is_satisfied_by(elapsed_blocks, elapsed_time)
     }
 
+    /// Returns whether an absolute timelock is met by the supplied chain state.
+    ///
+    /// Only the value matching the lock's kind is consulted: a block-height
+    /// lock needs `chain_height` and a time lock needs `chain_time`. A missing
+    /// value never counts as evidence that the lock has matured.
     pub fn check_after(&self, lock_time: absolute::LockTime) -> bool {
-        let height = self.chain_height.unwrap_or(absolute::Height::MIN);
-        let time = self.chain_time.unwrap_or(absolute::Time::MIN);
-        lock_time.is_satisfied_by(height, time)
+        match lock_time {
+            absolute::LockTime::Blocks(_) => self
+                .chain_height
+                .is_some_and(|height| lock_time.is_satisfied_by(height, absolute::Time::MIN)),
+            absolute::LockTime::Seconds(_) => self
+                .chain_time
+                .is_some_and(|time| lock_time.is_satisfied_by(absolute::Height::MIN, time)),
+        }
     }
 }

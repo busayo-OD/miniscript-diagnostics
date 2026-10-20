@@ -119,3 +119,53 @@ fn or_combinator_is_the_documented_dual_of_and() {
         Status::Impossible
     );
 }
+
+#[test]
+fn after_time_matches_bitcoin_absolute_locktime_is_satisfied_by() {
+    // (required, supplied chain time, expected)
+    let cases: &[(u32, u32, bool)] = &[
+        (500_000_000, 500_000_000, true),
+        (500_000_001, 500_000_000, false),
+        (500_000_001, 500_000_001, true),
+        (500_000_001, 500_000_002, true),
+    ];
+    for &(required, current, expect_satisfied) in cases {
+        let time = absolute::Time::from_consensus(current).unwrap();
+        let context: DiagnosticContext<PublicKey> = DiagnosticContext::new().with_chain_time(time);
+        let reference_satisfied = absolute::LockTime::from_time(required)
+            .unwrap()
+            .is_satisfied_by(absolute::Height::MIN, time);
+        assert_eq!(
+            reference_satisfied, expect_satisfied,
+            "test table itself is wrong for required={required} current={current}"
+        );
+
+        let diagnostic = parse_and_evaluate(&format!("after({required})"), &context).unwrap();
+        assert_eq!(
+            diagnostic.status == Status::Satisfied,
+            expect_satisfied,
+            "evaluator disagreed with bitcoin::absolute::LockTime::is_satisfied_by for required={required} current={current}"
+        );
+    }
+}
+
+#[test]
+fn after_without_matching_chain_evidence_is_unavailable() {
+    // `after(500000000)` is the smallest valid time-based lock. A missing chain
+    // time must not be read as "the minimum time has been reached".
+    let no_context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+    let height_only: DiagnosticContext<PublicKey> = DiagnosticContext::new()
+        .with_chain_height(absolute::Height::from_consensus(900_000).unwrap());
+
+    for context in [no_context, height_only] {
+        let diagnostic = parse_and_evaluate("after(500000000)", &context).unwrap();
+        assert_eq!(diagnostic.status, Status::Unavailable);
+        assert!(diagnostic.metadata.iter().any(|(k, _)| k == "note"));
+    }
+
+    // The converse: a height lock needs a chain height, not a chain time.
+    let time_only: DiagnosticContext<PublicKey> = DiagnosticContext::new()
+        .with_chain_time(absolute::Time::from_consensus(1_700_000_000).unwrap());
+    let diagnostic = parse_and_evaluate("after(500000)", &time_only).unwrap();
+    assert_eq!(diagnostic.status, Status::Unavailable);
+}
