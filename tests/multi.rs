@@ -65,3 +65,50 @@ fn multi_matches_equivalent_thresh_of_pk() {
     .unwrap();
     assert_eq!(multi.status, thresh.status);
 }
+
+#[test]
+fn label_and_metadata_report_k_n_and_satisfied_count() {
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new()
+        .with_key(key(KEY_A))
+        .with_key(key(KEY_B));
+    let diagnostic = parse_and_evaluate(&multi_str(2), &context).unwrap();
+
+    assert_eq!(diagnostic.fragment, "MULTI(2, 3)");
+    assert_eq!(
+        diagnostic.metadata,
+        vec![
+            ("required".to_string(), "2".to_string()),
+            ("satisfied".to_string(), "2".to_string()),
+        ]
+    );
+}
+
+#[test]
+fn every_key_subset_and_threshold_follows_the_counting_rule() {
+    // Keys are only ever Satisfied or Impossible, so `multi` can never be
+    // Unavailable: the status depends only on how many keys were supplied.
+    let keys = [KEY_A, KEY_B, KEY_C];
+    for mask in 0..(1u8 << keys.len()) {
+        let mut context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+        let mut available = 0;
+        for (index, k) in keys.iter().enumerate() {
+            if mask & (1 << index) != 0 {
+                context = context.with_key(key(k));
+                available += 1;
+            }
+        }
+        for k in 1..=keys.len() {
+            let diagnostic = parse_and_evaluate(&multi_str(k), &context).unwrap();
+            let expected = if available >= k {
+                Status::Satisfied
+            } else {
+                Status::Impossible
+            };
+            assert_eq!(diagnostic.status, expected, "mask={mask:#05b} k={k}");
+            assert!(diagnostic
+                .children
+                .iter()
+                .all(|c| matches!(c.status, Status::Satisfied | Status::Impossible)));
+        }
+    }
+}

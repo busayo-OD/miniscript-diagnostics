@@ -75,3 +75,60 @@ fn multi_a_matches_multi_status_semantics() {
 
     assert_eq!(multi_a_diagnostic.status, multi_diagnostic.status);
 }
+
+#[test]
+fn label_and_metadata_report_k_n_and_satisfied_count() {
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new()
+        .with_key(key(KEY_A))
+        .with_key(key(KEY_B));
+    let miniscript = parse_tap(&format!("multi_a(2,{KEY_A},{KEY_B},{KEY_C})"));
+    let diagnostic = evaluate(&miniscript, &context);
+
+    assert_eq!(diagnostic.fragment, "MULTI_A(2, 3)");
+    assert_eq!(
+        diagnostic.metadata,
+        vec![
+            ("required".to_string(), "2".to_string()),
+            ("satisfied".to_string(), "2".to_string()),
+        ]
+    );
+}
+
+#[test]
+fn every_key_subset_and_threshold_follows_the_counting_rule() {
+    let keys = [KEY_A, KEY_B, KEY_C];
+    for mask in 0..(1u8 << keys.len()) {
+        let mut context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+        let mut available = 0;
+        for (index, k) in keys.iter().enumerate() {
+            if mask & (1 << index) != 0 {
+                context = context.with_key(key(k));
+                available += 1;
+            }
+        }
+        for k in 1..=keys.len() {
+            let miniscript = parse_tap(&format!("multi_a({k},{KEY_A},{KEY_B},{KEY_C})"));
+            let diagnostic = evaluate(&miniscript, &context);
+            let expected = if available >= k {
+                Status::Satisfied
+            } else {
+                Status::Impossible
+            };
+            assert_eq!(diagnostic.status, expected, "mask={mask:#05b} k={k}");
+            assert_eq!(diagnostic.fragment, format!("MULTI_A({k}, 3)"));
+        }
+    }
+}
+
+#[test]
+fn multi_a_is_rejected_by_the_public_parse_functions() {
+    // Documents the current API/CLI boundary: `parse` and `parse_and_evaluate`
+    // are fixed to Segwitv0, so `multi_a` is only reachable by passing a
+    // Tap-context AST to `evaluate`. General Tapscript support is a separate
+    // milestone; update this test when it lands.
+    let source = format!("multi_a(2,{KEY_A},{KEY_B},{KEY_C})");
+    assert!(miniscript_diagnostics::parse::<PublicKey>(&source).is_err());
+
+    let context: DiagnosticContext<PublicKey> = DiagnosticContext::new();
+    assert!(miniscript_diagnostics::parse_and_evaluate(&source, &context).is_err());
+}
