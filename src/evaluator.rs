@@ -28,6 +28,7 @@ where
         Terminal::Alt(child)
         | Terminal::Swap(child)
         | Terminal::Check(child)
+        | Terminal::DupIf(child)
         | Terminal::Verify(child)
         | Terminal::NonZero(child)
         | Terminal::ZeroNotEqual(child) => evaluate_term(&child.node, ctx),

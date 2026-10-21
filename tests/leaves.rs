@@ -11,6 +11,10 @@ fn key(s: &str) -> bitcoin::PublicKey {
     s.parse().expect("valid test pubkey")
 }
 
+fn as_json(diagnostic: &miniscript_diagnostics::Diagnostic) -> serde_json::Value {
+    serde_json::to_value(diagnostic).unwrap()
+}
+
 #[test]
 fn satisfied_key() {
     let context: DiagnosticContext<_> = DiagnosticContext::new().with_key(key(KEY_A));
@@ -203,4 +207,29 @@ fn reason_text_after_and_older() {
         older.reason.as_deref(),
         Some("the relative timelock has not yet matured")
     );
+}
+
+// `d:` and `v:` are transparent in the evaluator, so `dv:older(144)` must
+// produce exactly the diagnostic of its bare `older(144)` leaf. The bare leaf
+// is the baseline because `v:older(144)` is V-typed and not a valid root.
+#[test]
+fn dupif_wrapper_matches_its_child_without_elapsed_blocks() {
+    let ctx = DiagnosticContext::new();
+    let wrapped = parse_and_evaluate::<PublicKey>("dv:older(144)", &ctx).unwrap();
+    let bare = parse_and_evaluate::<PublicKey>("older(144)", &ctx).unwrap();
+
+    assert_eq!(wrapped.status, Status::Unavailable);
+    assert_eq!(bare.status, Status::Unavailable);
+    assert_eq!(as_json(&wrapped), as_json(&bare));
+}
+
+#[test]
+fn dupif_wrapper_matches_its_child_with_144_elapsed_blocks() {
+    let ctx = DiagnosticContext::new().with_elapsed_blocks(relative::Height::from(144u16));
+    let wrapped = parse_and_evaluate::<PublicKey>("dv:older(144)", &ctx).unwrap();
+    let bare = parse_and_evaluate::<PublicKey>("older(144)", &ctx).unwrap();
+
+    assert_eq!(wrapped.status, Status::Satisfied);
+    assert_eq!(bare.status, Status::Satisfied);
+    assert_eq!(as_json(&wrapped), as_json(&bare));
 }

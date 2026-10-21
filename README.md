@@ -32,11 +32,11 @@ ROOT STATUS: UNAVAILABLE
 
 `multi_a` is supported by the evaluator only when it is given a Miniscript AST that uses the Tap context. `parse`, `parse_and_evaluate` and the CLI are fixed to the Segwitv0 context and reject `multi_a`. General Taproot/Tapscript support is future work.
 
-The wrappers `a:`, `s:`, `c:`, `v:`, `j:` and `n:` are evaluated transparently and do not appear as separate nodes in the diagnostic tree.
+The wrappers `a:`, `s:`, `c:`, `d:`, `v:`, `j:` and `n:` are evaluated transparently and do not appear as separate nodes in the diagnostic tree.
 
 ### Unsupported fragments
 
-The fragments `0` and `1`, the `d:` wrapper, and everything that expands to them (`and_n`, `t:`, `l:` and `u:`) are reported as `UNSUPPORTED`. An unsupported child makes its parent `UNSUPPORTED` unless the other children already decide the result: in an AND-type fragment an `IMPOSSIBLE` sibling still makes the result `IMPOSSIBLE`, and in an OR-type fragment a `SATISFIED` sibling still makes it `SATISFIED`. For example, `and_n(X,Y)` is `andor(X,Y,0)`, so it is `UNSUPPORTED` unless both `X` and `Y` are satisfied, even when `X` is impossible.
+The fragments `0` and `1`, and everything that expands to them (`and_n`, `t:`, `l:` and `u:`) are reported as `UNSUPPORTED`. An unsupported child makes its parent `UNSUPPORTED` unless the other children already decide the result: in an AND-type fragment an `IMPOSSIBLE` sibling still makes the result `IMPOSSIBLE`, and in an OR-type fragment a `SATISFIED` sibling still makes it `SATISFIED`. For example, `and_n(X,Y)` is `andor(X,Y,0)`, so it is `UNSUPPORTED` unless both `X` and `Y` are satisfied, even when `X` is impossible.
 
 ## CLI usage
 
