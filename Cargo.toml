@@ -4,7 +4,7 @@ version = "0.1.0-alpha.1"
 edition = "2021"
 description = "Diagnostics for Miniscript satisfaction under a supplied spending context."
 license = "CC0-1.0"
-repository = "https://github.com/busayo-OD/miniscript-diagnostics"
+repository = "https://github.com/busayo-od/miniscript-diagnostics"
 readme = "README.md"
 keywords = ["bitcoin", "miniscript"]
 
