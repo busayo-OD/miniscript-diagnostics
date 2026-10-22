@@ -2,7 +2,7 @@
 
 A Rust library and CLI that explains Miniscript satisfaction state under a supplied spending context.
 
-It walks the public `rust-miniscript` AST and produces a diagnostic tree showing why each supported fragment is `SATISFIED`, `UNAVAILABLE`, or `IMPOSSIBLE`. Fragments outside the supported set are reported as `UNSUPPORTED`. Each diagnostic node includes a reason when applicable, explaining why that status was reached.
+It walks the public `rust-miniscript` AST and produces a branch-level diagnostic tree that helps developers understand why each supported fragment is `SATISFIED`, `UNAVAILABLE`, or `IMPOSSIBLE` under the supplied context. Fragments outside the supported set are reported as `UNSUPPORTED`, and each diagnostic node includes a reason when applicable.
 
 This tool explains satisfaction feasibility under a supplied context; it does not generate witnesses or sign transactions.
 
